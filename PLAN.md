@@ -185,7 +185,7 @@ One arena, Tubbu with move/aim-autofire/dash, two enemy types, full juice.
 - [x] Tests: pool acquire/release/exhaustion behavior
 
 **Exit criteria**
-- [ ] Playtest: streams of glowing shots in aim direction; aiming feels 1:1 on stick and mouse
+- [x] Playtest: streams of glowing shots in aim direction; aiming feels 1:1 on stick and mouse
 - [x] Tests: green (33/33, 5 suites)
 
 ### CP 1.3 — Dash with i-frames
