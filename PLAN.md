@@ -35,9 +35,9 @@ Claude prepares the build and tuning knobs, but does not self-certify fun.
 
 ## Status
 
-- **Next checkpoint:** CP 1.3 — Dash with i-frames
+- **Next checkpoint:** CP 1.4 — Enemy 1: contact swarm + death loop
 - **Phase:** 1 — The Toy
-- **Last updated:** 2026-06-12 (CP 1.2 build + tests done on Fable; awaiting Ludo's aim/autofire playtest)
+- **Last updated:** 2026-06-12 (CP 1.2 + 1.3 builds + tests done; awaiting Ludo's aim/autofire and dash playtests)
 
 ---
 
@@ -192,14 +192,14 @@ One arena, Tubbu with move/aim-autofire/dash, two enemy types, full juice.
 
 **Goal:** The survival verb.
 
-- [ ] Dash impulse along move (or aim-neutral fallback) with ~1 s cooldown const
-- [ ] I-frame window during dash; hitbox disabled, visual state clearly distinct (ghost/trail)
-- [ ] Cooldown feedback (subtle ship glow refill — readable without HUD)
-- [ ] Tests: cooldown timing, i-frame window state machine
+- [x] Dash impulse along move (or aim-neutral fallback) with ~1 s cooldown const
+- [x] I-frame window during dash; hitbox disabled, visual state clearly distinct (ghost/trail)
+- [x] Cooldown feedback (subtle ship glow refill — readable without HUD)
+- [x] Tests: cooldown timing, i-frame window state machine
 
 **Exit criteria**
 - [ ] Playtest: dash-weaving through the empty arena already feels like a game
-- [ ] Tests: green
+- [x] Tests: green (41/41, 6 suites)
 
 ### CP 1.4 — Enemy 1: contact swarm + death loop
 
@@ -583,6 +583,7 @@ CRT layer, audio, menus/settings, input glyphs, high-score board.
 ## Session log
 
 <!-- Newest first. One line: date — checkpoint(s) touched — outcome/notes. -->
+- 2026-06-12 — CP 1.3 build done (same Fable session as CP 1.2; 1.3 isn't 🧠 but running a routine cp on the bigger model is fine — the policy only forbids the reverse). `DashAbility` (game/player/, RefCounted, owner-ticked like PlayerInput/Weapon): DASH_SPEED 1500 / DASH_DURATION 0.16 / I_FRAMES 0.16 / COOLDOWN 1.0 from dash start; i-frames on their OWN clock so CP 2.7's longer-i-frames upgrade is a number change; `is_invulnerable()` exposed on Tubbu — this IS the "hitbox disabled" mechanism, CP 1.4's contact kill must check it (no hitbox node exists yet). Dash direction = move vector, else last nonzero move dir (aim-neutral fallback — never the gun direction; init +X = spawn facing). During dash control is suspended (velocity = dash vector each frame; wall slide still applies → no snag), exit keeps the speed and friction reclaims it (glide out). Visuals via self_modulate only (scales the skin's own colors, asset rule intact; trail is a separate canvas item so it stays vivid): ghost body alpha 0.4 while dashing, body brightness 0.55→1.0 refilling with cooldown = the no-HUD readiness cue. Tests 41/41 (+8 dash: cooldown timing, i-frame window, fraction refill). Boot clean. Checkpoint NOT closed: Ludo's dash-weave playtest pending (plus the CP 1.2 aim playtest).
 - 2026-06-12 — CP 1.2 build done on Fable (🧠 cp). Load-bearing decisions: (1) `PlayerInput.get_aim_vector(shooter: Node2D)` — mouse only becomes a direction relative to a world anchor, so the ship passes itself; kb+m aim is never zero (cursor always somewhere) and a degenerate on-ship cursor holds the last aim; gamepad path = deadzoned right stick, ZERO = not aiming. Trigger policy is explicit in `is_fire_held(aim)` (stick past deadzone fires; kb+m autofire always on), not implicit in aim==zero. (2) `BulletManager` (game/weapons/): bullets are NOT nodes — slot-stable parallel arrays (SoA) behind a narrow spawn/clear/count API so the CP 3.5 MultiMesh move is internal (stable slot → instance index); free-list pool, exhaustion recycles the OLDEST bullet (gun never stutters); wall-bounds cull + TTL backstop; `owner_index` per bullet for co-op/scoring attribution; one `_draw` pass (streak + core, palette color). (3) `Weapon` RefCounted in game/weapons/ (FIRE_RATE 9/s, MUZZLE_OFFSET 22): cooldown accumulator — instant first shot, no banked shots, multi-shot catch-up on hitch frames; the exact seam CP 2.4's stat pipeline replaces. Tubbu: facing now follows aim (travel-dir fallback for neutral pad stick); bullets fly the EXACT aim vector — the nose slew is cosmetic, so aiming is 1:1. Tests 33/33 (+16: pool 9, weapon 5, trigger policy 2). Boot clean. Gotcha: CanvasItem has no `global_position` — type world-anchored params as Node2D. Checkpoint NOT closed: Ludo's stick+mouse aim playtest pending.
 - 2026-06-12 — CP 1.1 build done on Opus (not a 🧠 FABLE cp): real movement on Tubbu (accel/friction via move_toward, MAX_SPEED 560 / ACCEL 4200 / FRICTION 3000; heading slews to travel dir, banking via skew from turn rate — all tuning consts in one block, CP 1.8 lifts them to a debug panel). New `game/arena/`: Arena (script-only Node2D, centred rect bounds at world origin, double-line neon walls from palette, static pure `slide_inside` = per-axis clamp + into-wall velocity cancel = slide-no-snag) and ArenaCamera (script-only Camera2D, smoothed follow + velocity-lead by LEAD_TIME, arena-clamped via limits; owned by Game not the player, co-op note left). Engine trail = top_level Line2D (z -1) fed rear-of-ship world points, gradient+width taper from skin.trail_color (collapses to a dot when idle). Game wires arena+camera+player; arena default size 2000×1300 (larger than the 1280×720 view so follow/lead reads). Tests 17/17 (added test_arena: inside/slide/corner/radius). Headless 150-frame boot clean (no errors). Checkpoint NOT closed: Ludo's 2-min kb+m+controller flying playtest pending (also closes the deferred CP 0.2 wiggle test). Next CP 1.2 is 🧠 FABLE — needs `/model fable`.
 - 2026-06-12 — CP 0.2 build finished on Fable: PlayerInput in game/player/ (kb+m via InputMap actions, gamepad via raw per-device axes; radial deadzone w/ rescale; dash edge latch via update()); input_actions.gd moved core/→game/player/ (core/ is autoloads-only); SkinResource (game/player/) + PaletteResource (game/fx/) + default .tres in assets/skins|palettes (overbright neon for HDR bloom); Game shell draws rect arena from palette, spawns Tubbu by index w/ bound kb+m PlayerInput (pad drives it too via device -1 action events — fine for v1 N=1); main boots into Game until CP 2.1. Tests 13/13 green. Gotcha: new class_name needs a `--headless --import` pass before headless runs see it. Checkpoint NOT closed: Ludo's kb+m+controller wiggle playtest pending.
