@@ -34,9 +34,9 @@ Claude prepares the build and tuning knobs, but does not self-certify fun.
 
 ## Status
 
-- **Next checkpoint:** CP 0.2 (in progress — autoloads done; PlayerInput next)
+- **Next checkpoint:** CP 0.2 (build + tests done on Fable; awaiting Ludo's kb+m/controller playtest to close)
 - **Phase:** 0 — Bootstrap
-- **Last updated:** 2026-06-12 (CP 0.1 complete; CP 0.2 step 1/5 done on Fable)
+- **Last updated:** 2026-06-12 (CP 0.2 build complete; playtest pending)
 
 ---
 
@@ -122,14 +122,14 @@ Claude prepares the build and tuning knobs, but does not self-certify fun.
 **Goal:** The autoload spine and the player-N pattern exist before any gameplay.
 
 - [x] Autoloads: `EventBus` (typed signals), `SettingsStore` (stub), `AudioRegistry` (stub, ID→stream map), `SaveStore` (stub)
-- [ ] `PlayerInput` class: device-bound, exposes move vector / aim vector / dash pressed; kb+m and gamepad implementations
-- [ ] `SkinResource` + `PaletteResource` definitions with one default of each (placeholder neon palette)
-- [ ] `Game` scene shell: spawns player 0 with a bound `PlayerInput`, inside a placeholder rect arena
-- [ ] Tests: PlayerInput device binding, AudioRegistry lookup fallback
+- [x] `PlayerInput` class: device-bound, exposes move vector / aim vector / dash pressed; kb+m and gamepad implementations
+- [x] `SkinResource` + `PaletteResource` definitions with one default of each (placeholder neon palette)
+- [x] `Game` scene shell: spawns player 0 with a bound `PlayerInput`, inside a placeholder rect arena
+- [x] Tests: PlayerInput device binding, AudioRegistry lookup fallback
 
 **Exit criteria**
 - [ ] Playtest: a placeholder wireframe shape sits in an arena; both kb+m and a controller wiggle it (crude movement OK)
-- [ ] Tests: green
+- [x] Tests: green (13/13, 2 suites)
 
 ---
 
@@ -559,6 +559,7 @@ CRT layer, audio, menus/settings, input glyphs, high-score board.
 ## Session log
 
 <!-- Newest first. One line: date — checkpoint(s) touched — outcome/notes. -->
+- 2026-06-12 — CP 0.2 build finished on Fable: PlayerInput in game/player/ (kb+m via InputMap actions, gamepad via raw per-device axes; radial deadzone w/ rescale; dash edge latch via update()); input_actions.gd moved core/→game/player/ (core/ is autoloads-only); SkinResource (game/player/) + PaletteResource (game/fx/) + default .tres in assets/skins|palettes (overbright neon for HDR bloom); Game shell draws rect arena from palette, spawns Tubbu by index w/ bound kb+m PlayerInput (pad drives it too via device -1 action events — fine for v1 N=1); main boots into Game until CP 2.1. Tests 13/13 green. Gotcha: new class_name needs a `--headless --import` pass before headless runs see it. Checkpoint NOT closed: Ludo's kb+m+controller wiggle playtest pending.
 - 2026-06-12 — CP 0.2 started on Fable per model policy (earlier Opus drafts discarded/redone). Autoload spine done: EventBus (gameplay events only, player_index rule), SettingsStore (own `changed` signal — no autoload→autoload deps), AudioRegistry (ID→stream, warn+fallback), SaveStore (versioned schema stub); registered + headless-verified. Stopped after step 1 per Ludo; next: PlayerInput (note: belongs in game/player/ per layout, not core/).
 - 2026-06-12 — CP 0.1 done: Godot 4.6.3 pinned, Forward+/HDR 2D, folder layout, input map verified headless, GUT v9.6.0 installed (no tests in 0.1 per Ludo), git init + first commit.
 - 2026-06-12 — Plan created from DESIGN.md (no code yet). Next: CP 0.1.

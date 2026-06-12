@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PaletteResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/fx/palette_resource.gd" id="1_palette"]
+
+[resource]
+script = ExtResource("1_palette")
+background_color = Color(0.04, 0.04, 0.06, 1)
+grid_color = Color(0.15, 0.1, 0.35, 1)
+arena_wall_color = Color(0.2, 1.2, 1.4, 1)
+player_bullet_color = Color(1.4, 1.2, 0.4, 1)
+enemy_color = Color(1.3, 0.3, 1.2, 1)
+enemy_bullet_color = Color(1.6, 0.2, 0.4, 1)
