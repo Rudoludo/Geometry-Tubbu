@@ -34,9 +34,9 @@ Claude prepares the build and tuning knobs, but does not self-certify fun.
 
 ## Status
 
-- **Next checkpoint:** CP 0.2 (build + tests done on Fable; awaiting Ludo's kb+m/controller playtest to close)
-- **Phase:** 0 — Bootstrap
-- **Last updated:** 2026-06-12 (CP 0.2 build complete; playtest pending)
+- **Next checkpoint:** CP 1.2 — Aim & autofire (🧠 **FABLE** — switch to `/model fable` before any load-bearing work)
+- **Phase:** 1 — The Toy
+- **Last updated:** 2026-06-12 (CP 1.1 build + tests complete; awaiting Ludo's flying playtest, which also closes the deferred CP 0.2 wiggle test)
 
 ---
 
@@ -142,14 +142,14 @@ One arena, Tubbu with move/aim-autofire/dash, two enemy types, full juice.
 
 **Goal:** Gliding around the arena feels good before anything shoots.
 
-- [ ] Tubbu movement: acceleration/friction model, tunable consts in one place; rotation/banking toward movement
-- [ ] Bounded rect arena with visible neon walls; soft wall collision (slide, no bounce jank)
-- [ ] Camera: subtle follow/lead, arena-clamped
-- [ ] Tubbu placeholder body drawn from `SkinResource` (wireframe polygon + engine trail)
+- [x] Tubbu movement: acceleration/friction model, tunable consts in one place; rotation/banking toward movement
+- [x] Bounded rect arena with visible neon walls; soft wall collision (slide, no bounce jank)
+- [x] Camera: subtle follow/lead, arena-clamped
+- [x] Tubbu placeholder body drawn from `SkinResource` (wireframe polygon + engine trail)
 
 **Exit criteria**
 - [ ] Playtest: 2 minutes of just flying feels responsive on both input types; no wall snags
-- [ ] Tests: existing suite green
+- [x] Tests: existing suite green (17/17, 3 suites)
 
 ### CP 1.2 — Aim & autofire 🧠 FABLE
 
@@ -559,6 +559,7 @@ CRT layer, audio, menus/settings, input glyphs, high-score board.
 ## Session log
 
 <!-- Newest first. One line: date — checkpoint(s) touched — outcome/notes. -->
+- 2026-06-12 — CP 1.1 build done on Opus (not a 🧠 FABLE cp): real movement on Tubbu (accel/friction via move_toward, MAX_SPEED 560 / ACCEL 4200 / FRICTION 3000; heading slews to travel dir, banking via skew from turn rate — all tuning consts in one block, CP 1.8 lifts them to a debug panel). New `game/arena/`: Arena (script-only Node2D, centred rect bounds at world origin, double-line neon walls from palette, static pure `slide_inside` = per-axis clamp + into-wall velocity cancel = slide-no-snag) and ArenaCamera (script-only Camera2D, smoothed follow + velocity-lead by LEAD_TIME, arena-clamped via limits; owned by Game not the player, co-op note left). Engine trail = top_level Line2D (z -1) fed rear-of-ship world points, gradient+width taper from skin.trail_color (collapses to a dot when idle). Game wires arena+camera+player; arena default size 2000×1300 (larger than the 1280×720 view so follow/lead reads). Tests 17/17 (added test_arena: inside/slide/corner/radius). Headless 150-frame boot clean (no errors). Checkpoint NOT closed: Ludo's 2-min kb+m+controller flying playtest pending (also closes the deferred CP 0.2 wiggle test). Next CP 1.2 is 🧠 FABLE — needs `/model fable`.
 - 2026-06-12 — CP 0.2 build finished on Fable: PlayerInput in game/player/ (kb+m via InputMap actions, gamepad via raw per-device axes; radial deadzone w/ rescale; dash edge latch via update()); input_actions.gd moved core/→game/player/ (core/ is autoloads-only); SkinResource (game/player/) + PaletteResource (game/fx/) + default .tres in assets/skins|palettes (overbright neon for HDR bloom); Game shell draws rect arena from palette, spawns Tubbu by index w/ bound kb+m PlayerInput (pad drives it too via device -1 action events — fine for v1 N=1); main boots into Game until CP 2.1. Tests 13/13 green. Gotcha: new class_name needs a `--headless --import` pass before headless runs see it. Checkpoint NOT closed: Ludo's kb+m+controller wiggle playtest pending.
 - 2026-06-12 — CP 0.2 started on Fable per model policy (earlier Opus drafts discarded/redone). Autoload spine done: EventBus (gameplay events only, player_index rule), SettingsStore (own `changed` signal — no autoload→autoload deps), AudioRegistry (ID→stream, warn+fallback), SaveStore (versioned schema stub); registered + headless-verified. Stopped after step 1 per Ludo; next: PlayerInput (note: belongs in game/player/ per layout, not core/).
 - 2026-06-12 — CP 0.1 done: Godot 4.6.3 pinned, Forward+/HDR 2D, folder layout, input map verified headless, GUT v9.6.0 installed (no tests in 0.1 per Ludo), git init + first commit.
