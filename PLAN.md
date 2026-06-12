@@ -34,9 +34,9 @@ Claude prepares the build and tuning knobs, but does not self-certify fun.
 
 ## Status
 
-- **Next checkpoint:** CP 0.1
+- **Next checkpoint:** CP 0.2 (in progress — autoloads done; PlayerInput next)
 - **Phase:** 0 — Bootstrap
-- **Last updated:** 2026-06-12 (plan created; no code yet)
+- **Last updated:** 2026-06-12 (CP 0.1 complete; CP 0.2 step 1/5 done on Fable)
 
 ---
 
@@ -121,7 +121,7 @@ Claude prepares the build and tuning knobs, but does not self-certify fun.
 
 **Goal:** The autoload spine and the player-N pattern exist before any gameplay.
 
-- [ ] Autoloads: `EventBus` (typed signals), `SettingsStore` (stub), `AudioRegistry` (stub, ID→stream map), `SaveStore` (stub)
+- [x] Autoloads: `EventBus` (typed signals), `SettingsStore` (stub), `AudioRegistry` (stub, ID→stream map), `SaveStore` (stub)
 - [ ] `PlayerInput` class: device-bound, exposes move vector / aim vector / dash pressed; kb+m and gamepad implementations
 - [ ] `SkinResource` + `PaletteResource` definitions with one default of each (placeholder neon palette)
 - [ ] `Game` scene shell: spawns player 0 with a bound `PlayerInput`, inside a placeholder rect arena
@@ -559,4 +559,6 @@ CRT layer, audio, menus/settings, input glyphs, high-score board.
 ## Session log
 
 <!-- Newest first. One line: date — checkpoint(s) touched — outcome/notes. -->
+- 2026-06-12 — CP 0.2 started on Fable per model policy (earlier Opus drafts discarded/redone). Autoload spine done: EventBus (gameplay events only, player_index rule), SettingsStore (own `changed` signal — no autoload→autoload deps), AudioRegistry (ID→stream, warn+fallback), SaveStore (versioned schema stub); registered + headless-verified. Stopped after step 1 per Ludo; next: PlayerInput (note: belongs in game/player/ per layout, not core/).
+- 2026-06-12 — CP 0.1 done: Godot 4.6.3 pinned, Forward+/HDR 2D, folder layout, input map verified headless, GUT v9.6.0 installed (no tests in 0.1 per Ludo), git init + first commit.
 - 2026-06-12 — Plan created from DESIGN.md (no code yet). Next: CP 0.1.
