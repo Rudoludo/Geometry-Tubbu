@@ -198,7 +198,7 @@ One arena, Tubbu with move/aim-autofire/dash, two enemy types, full juice.
 - [x] Tests: cooldown timing, i-frame window state machine
 
 **Exit criteria**
-- [ ] Playtest: dash-weaving through the empty arena already feels like a game
+- [x] Playtest: dash-weaving through the empty arena already feels like a game
 - [x] Tests: green (41/41, 6 suites)
 
 ### CP 1.4 — Enemy 1: contact swarm + death loop
