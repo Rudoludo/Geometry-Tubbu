@@ -31,9 +31,25 @@ func test_unplugged_gamepad_reads_neutral() -> void:
 	# never error.
 	var input := PlayerInput.for_gamepad(7)
 	input.update()
+	var shooter: Node2D = autofree(Node2D.new())
 	assert_eq(input.get_move_vector(), Vector2.ZERO)
-	assert_eq(input.get_aim_vector(), Vector2.ZERO)
+	assert_eq(input.get_aim_vector(shooter), Vector2.ZERO)
 	assert_false(input.is_dash_pressed())
+
+
+func test_gamepad_stick_is_the_trigger() -> void:
+	# Design rule: deflection past the deadzone IS the fire input.
+	var input := PlayerInput.for_gamepad(0)
+	assert_false(input.is_fire_held(Vector2.ZERO), "neutral stick holds fire")
+	assert_true(input.is_fire_held(Vector2(0.3, 0.0)), "deflected stick fires")
+
+
+func test_kbm_autofire_is_always_on() -> void:
+	# Design rule: kb+m has no trigger — the mouse aims, fire never stops.
+	var input := PlayerInput.for_keyboard_mouse()
+	assert_true(input.is_fire_held(Vector2.RIGHT))
+	assert_true(input.is_fire_held(Vector2.ZERO),
+		"even a degenerate aim must not silence the kb+m gun")
 
 
 func test_kbm_dash_edge_latching() -> void:

@@ -11,12 +11,20 @@ const PALETTE: PaletteResource = preload("res://assets/palettes/default_palette.
 
 var arena: Arena
 var camera: ArenaCamera
+var bullet_manager: BulletManager
 
 
 func _ready() -> void:
 	arena = Arena.new()
 	arena.palette = PALETTE
 	add_child(arena)
+
+	# One manager for every projectile in the scene (players now, enemies at
+	# CP 1.5). Added before the players so ships draw above the bullet layer.
+	bullet_manager = BulletManager.new()
+	bullet_manager.palette = PALETTE
+	bullet_manager.bounds = arena.bounds()
+	add_child(bullet_manager)
 
 	var player := _spawn_player(0)
 
@@ -38,6 +46,7 @@ func _spawn_player(player_index: int) -> Tubbu:
 	# too; true per-device assignment is the co-op feature, not v1.
 	tubbu.input = PlayerInput.for_keyboard_mouse()
 	tubbu.skin = DEFAULT_SKIN
+	tubbu.bullet_manager = bullet_manager
 	tubbu.move_bounds = arena.bounds()
 	tubbu.position = arena.bounds().get_center()
 	add_child(tubbu)

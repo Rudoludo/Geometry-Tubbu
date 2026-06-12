@@ -19,12 +19,18 @@ enum DeviceKind { KEYBOARD_MOUSE, GAMEPAD }
 ## Same value as the move/aim actions in project.godot.
 const STICK_DEADZONE := 0.2
 
+## Inside this radius of the shooter the cursor has no usable direction;
+## mouse aim holds the last good one instead of flickering.
+const MOUSE_DEAD_RADIUS := 2.0
+
 var device_kind := DeviceKind.KEYBOARD_MOUSE
 ## Joypad device id for GAMEPAD bindings; -1 for kb+m.
 var device_id := -1
 
 var _dash_pressed := false
 var _dash_just_pressed := false
+## Ships spawn facing +X, so that's the degenerate-mouse fallback too.
+var _last_mouse_aim := Vector2.RIGHT
 
 
 static func for_keyboard_mouse() -> PlayerInput:
@@ -55,14 +61,32 @@ func get_move_vector() -> Vector2:
 		InputActions.MOVE_UP, InputActions.MOVE_DOWN)
 
 
-## Stick aim direction, length 0..1 (zero inside the deadzone — CP 1.2 uses
-## "past deadzone" as the fire trigger). kb+m aims with the mouse, which needs
-## a world-space anchor; that path lands in CP 1.2 (aim & autofire).
-func get_aim_vector() -> Vector2:
+## Aim intent.
+## GAMEPAD: right-stick deflection, deadzoned (length 0..1). ZERO means "not
+## aiming" — which per design also means "not firing" (stick = trigger).
+## KB+M: unit vector from `shooter` toward the mouse cursor, in world space.
+## The cursor only becomes a direction relative to a world anchor, so the
+## reading ship passes itself; the gamepad path ignores it. Never zero — the
+## cursor is always somewhere — matching the design's always-on kb+m autofire
+## (see [method is_fire_held]).
+func get_aim_vector(shooter: Node2D) -> Vector2:
 	if device_kind == DeviceKind.GAMEPAD:
 		return apply_deadzone(
 			_read_stick(JOY_AXIS_RIGHT_X, JOY_AXIS_RIGHT_Y), STICK_DEADZONE)
-	return Vector2.ZERO
+	var to_mouse := shooter.get_global_mouse_position() - shooter.global_position
+	if to_mouse.length() > MOUSE_DEAD_RADIUS:
+		_last_mouse_aim = to_mouse.normalized()
+	return _last_mouse_aim
+
+
+## The trigger rule (DESIGN.md): the right stick IS the trigger — deflection
+## past the deadzone fires; kb+m has no trigger at all, autofire is always on.
+## Takes the aim already read this frame so the policy lives here without a
+## second device read. Pure; unit-tested.
+func is_fire_held(aim: Vector2) -> bool:
+	if device_kind == DeviceKind.GAMEPAD:
+		return aim != Vector2.ZERO
+	return true
 
 
 func is_dash_pressed() -> bool:
