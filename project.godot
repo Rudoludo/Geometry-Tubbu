@@ -19,6 +19,7 @@ EventBus="*res://core/event_bus.gd"
 SettingsStore="*res://core/settings_store.gd"
 AudioRegistry="*res://core/audio_registry.gd"
 SaveStore="*res://core/save_store.gd"
+RunState="*res://core/run_state.gd"
 
 [display]
 

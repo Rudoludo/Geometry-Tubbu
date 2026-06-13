@@ -1,10 +1,14 @@
+class_name Game
 extends Node2D
-## Game scene shell.
+## The in-run play scene: arena, player(s), enemies, juice. Built by GameFlow
+## when a run starts (CP 2.1) — it no longer self-runs from main.tscn.
 ##
 ## CP 1.1: a real bounded arena with neon walls, player 0 flying with the
 ## acceleration/friction model, and an arena-clamped follow camera. CP 1.4:
-## chaser sandbox (spawner + debug panel) and the death → instant-restart
-## loop. CP 2.1 puts the run state machine above this.
+## chaser sandbox (spawner + debug panel) and the instant-restart loop. CP 2.1:
+## GameFlow owns the run state above this — Game reports the run lost
+## ([signal run_lost]) and resets in place on retry ([method reset_run]); the
+## sandbox debug panel is gated behind [member debug].
 ##
 ## Input ownership: Game binds devices to players, so Game calls each
 ## PlayerInput.update() once per frame. Parents process before children, so
@@ -22,8 +26,17 @@ var bullet_manager: BulletManager
 var spawner: SandboxSpawner
 var pattern_spawner: PatternSpawner
 
+## Emitted once when the last player dies — GameFlow turns this into the Death
+## state. Game itself no longer restarts; the flow drives that (CP 2.1).
+signal run_lost
+
+## Debug-only chrome (the sandbox tuning panel). GameFlow sets it from
+## OS.is_debug_build(), so it shows in dev and vanishes in release builds.
+var debug := false
+
 ## Players by index (co-op rule: an array, never a singleton).
 var _players: Array[Tubbu] = []
+var _run_lost_emitted := false
 
 
 func _ready() -> void:
@@ -82,30 +95,36 @@ func _ready() -> void:
 	# owns the global time-freeze. Both are settings-scaled and event-driven.
 	add_child(HitStop.new())
 
-	var debug_panel := DebugPanel.new()
-	debug_panel.spawner = spawner
-	debug_panel.pattern_spawner = pattern_spawner
-	debug_panel.bullet_manager = bullet_manager
-	debug_panel.grid = grid
-	debug_panel.players = _players  # CP 1.8 feel knobs write to the live players
-	add_child(debug_panel)
+	# Debug-only sandbox panel (spawn rate + feel knobs). CP 2.1 gates it behind
+	# the debug flag so it never shows in a real run / release build.
+	if debug:
+		var debug_panel := DebugPanel.new()
+		debug_panel.spawner = spawner
+		debug_panel.pattern_spawner = pattern_spawner
+		debug_panel.bullet_manager = bullet_manager
+		debug_panel.grid = grid
+		debug_panel.players = _players  # CP 1.8 feel knobs write to the live players
+		add_child(debug_panel)
 
 
 func _process(_delta: float) -> void:
-	var any_dead := false
-	var restart_wanted := false
+	# Game binds the devices, so it ticks every player's PlayerInput here (parents
+	# process before children → ships read fresh latches, even a dead one). The
+	# flow above owns restart now; Game only reports when the run is lost.
+	var any_alive := false
 	for player in _players:
 		player.input.update()
-		any_dead = any_dead or not player.is_alive()
-		restart_wanted = restart_wanted or player.input.is_restart_just_pressed()
-	# Restart is only armed by death — no accidental mid-surf wipes. Any
-	# player's button restarts everyone (the sandbox is shared).
-	if any_dead and restart_wanted:
-		_restart()
+		any_alive = any_alive or player.is_alive()
+	if not any_alive and not _run_lost_emitted and not _players.is_empty():
+		_run_lost_emitted = true
+		run_lost.emit()
 
 
-## The instant-restart loop (CP 1.4): wipe the board, ships fresh at center.
-func _restart() -> void:
+## The instant-restart loop (CP 1.4): wipe the board, ships fresh at center —
+## same nodes (so live debug tuning survives), now driven by GameFlow on a
+## death-screen retry instead of a sandbox R press.
+func reset_run() -> void:
+	_run_lost_emitted = false
 	bullet_manager.clear()  # wipes both bands — no stray enemy orb kills the revive
 	spawner.clear()
 	pattern_spawner.clear()
