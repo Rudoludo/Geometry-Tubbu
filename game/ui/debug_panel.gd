@@ -6,6 +6,8 @@ extends CanvasLayer
 ## UI rule applies to real game UI, and this never ships.
 
 var spawner: SandboxSpawner  # injected by Game
+var pattern_spawner: PatternSpawner  # injected by Game
+var bullet_manager: BulletManager  # injected by Game
 
 var _rate_label: Label
 var _count_label: Label
@@ -30,6 +32,13 @@ func _ready() -> void:
 	slider.value = spawner.spawn_rate
 	slider.value_changed.connect(_on_rate_changed)
 	column.add_child(slider)
+
+	var shooters_toggle := CheckButton.new()
+	shooters_toggle.text = "pattern shooters"
+	shooters_toggle.button_pressed = pattern_spawner.enabled
+	shooters_toggle.toggled.connect(_on_shooters_toggled)
+	column.add_child(shooters_toggle)
+
 	_count_label = Label.new()
 	column.add_child(_count_label)
 	var hint := Label.new()
@@ -39,7 +48,17 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_count_label.text = "chasers: %d" % spawner.live_count()
+	_count_label.text = "chasers: %d  shooters: %d\nenemy bullets: %d" % [
+		spawner.live_count(),
+		pattern_spawner.live_count(),
+		bullet_manager.active_enemy_bullet_count(),
+	]
+
+
+func _on_shooters_toggled(pressed: bool) -> void:
+	pattern_spawner.enabled = pressed
+	if not pressed:
+		pattern_spawner.clear()
 
 
 func _on_rate_changed(value: float) -> void:

@@ -130,3 +130,94 @@ func test_one_bullet_kills_at_most_one_target() -> void:
 	var stacked := [_target_at(Vector2(50.0, 0.0)), _target_at(Vector2(51.0, 0.0))]
 	var hits := _bm.collide_player_bullets(stacked, 10.0)
 	assert_eq(hits.size(), 1, "no free pierce on overlapping targets")
+
+
+# --- enemy band (CP 1.5) ----------------------------------------------------
+
+func test_enemy_bullet_lives_in_its_own_band() -> void:
+	_bm.spawn_enemy_bullet(Vector2.ZERO, Vector2(0.0, 100.0))
+	assert_eq(_bm.active_enemy_bullet_count(), 1)
+	assert_eq(_bm.active_player_bullet_count(), 0, "the two bands never share slots")
+
+
+func test_enemy_bullet_moves_along_its_velocity() -> void:
+	# The shooter owns the speed: the manager flies the exact velocity given.
+	_bm.spawn_enemy_bullet(Vector2.ZERO, Vector2(100.0, 0.0))
+	_bm.step(0.1)
+	assert_almost_eq(_bm.debug_enemy_bullets()[0]["position"],
+		Vector2(10.0, 0.0), Vector2(0.001, 0.001))
+
+
+func test_enemy_bullet_ttl_cleanup() -> void:
+	_bm.spawn_enemy_bullet(Vector2.ZERO, Vector2(0.0, 100.0))
+	_bm.step(BulletManager.ENEMY_BULLET_TTL + 0.01)
+	assert_eq(_bm.active_enemy_bullet_count(), 0, "TTL is the no-bounds backstop")
+
+
+func test_enemy_bullet_leaving_bounds_releases_slot_before_ttl() -> void:
+	_bm.bounds = Rect2(-100.0, -100.0, 200.0, 200.0)
+	_bm.spawn_enemy_bullet(Vector2.ZERO, Vector2(2000.0, 0.0))
+	_bm.step(0.2)  # 400 px > the 100 px to the wall; far inside the 8 s TTL
+	assert_eq(_bm.active_enemy_bullet_count(), 0)
+
+
+func test_zero_velocity_enemy_bullet_spawns_nothing() -> void:
+	_bm.spawn_enemy_bullet(Vector2.ZERO, Vector2.ZERO)
+	assert_eq(_bm.active_enemy_bullet_count(), 0, "no stationary orbs")
+
+
+func test_clear_empties_both_bands() -> void:
+	_bm.spawn_player_bullet(0, Vector2.ZERO, Vector2.RIGHT)
+	_bm.spawn_enemy_bullet(Vector2.ZERO, Vector2(0.0, 100.0))
+	_bm.clear()
+	assert_eq(_bm.active_player_bullet_count(), 0)
+	assert_eq(_bm.active_enemy_bullet_count(), 0)
+
+
+# --- collide_enemy_bullets_with_players (CP 1.5) ----------------------------
+
+## In-tree ship (global_position valid) with no input, so its _process is inert.
+func _ship_at(at: Vector2) -> Tubbu:
+	var tubbu := Tubbu.new()
+	tubbu.position = at
+	add_child_autofree(tubbu)
+	return tubbu
+
+
+func test_enemy_bullet_kills_an_exposed_player() -> void:
+	var player := _ship_at(Vector2(50.0, 0.0))
+	_bm.spawn_enemy_bullet(Vector2(52.0, 0.0), Vector2(0.0, 100.0))
+	var kills := _bm.collide_enemy_bullets_with_players([player], 10.0)
+	assert_eq(kills, 1)
+	assert_false(player.is_alive(), "one orb, one death")
+	assert_eq(_bm.active_enemy_bullet_count(), 0, "the killing orb is consumed")
+
+
+func test_enemy_bullet_passes_through_dash_iframes() -> void:
+	# The dash rule lives in Tubbu.try_kill; the bullet must honor it and slip by.
+	var player := _ship_at(Vector2(50.0, 0.0))
+	player._dash.try_dash(Vector2.RIGHT)
+	assert_true(player.is_invulnerable(), "sanity: i-frames are up")
+	_bm.spawn_enemy_bullet(Vector2(52.0, 0.0), Vector2(0.0, 100.0))
+	var kills := _bm.collide_enemy_bullets_with_players([player], 10.0)
+	assert_eq(kills, 0, "i-frames shrug it off")
+	assert_true(player.is_alive())
+	assert_eq(_bm.active_enemy_bullet_count(), 1, "the orb passes through, not consumed")
+
+
+func test_enemy_bullet_misses_outside_the_radius() -> void:
+	var player := _ship_at(Vector2(50.0, 0.0))
+	_bm.spawn_enemy_bullet(Vector2(200.0, 0.0), Vector2(0.0, 100.0))
+	var kills := _bm.collide_enemy_bullets_with_players([player], 10.0)
+	assert_eq(kills, 0)
+	assert_true(player.is_alive())
+	assert_eq(_bm.active_enemy_bullet_count(), 1, "a miss costs nothing")
+
+
+func test_enemy_bullet_ignores_a_corpse() -> void:
+	var player := _ship_at(Vector2(50.0, 0.0))
+	player.try_kill()
+	_bm.spawn_enemy_bullet(Vector2(50.0, 0.0), Vector2(0.0, 100.0))
+	var kills := _bm.collide_enemy_bullets_with_players([player], 10.0)
+	assert_eq(kills, 0, "a dead player can't be killed again")
+	assert_eq(_bm.active_enemy_bullet_count(), 1, "and the orb is not consumed")

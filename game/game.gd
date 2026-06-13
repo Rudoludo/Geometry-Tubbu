@@ -19,6 +19,7 @@ var arena: Arena
 var camera: ArenaCamera
 var bullet_manager: BulletManager
 var spawner: SandboxSpawner
+var pattern_spawner: PatternSpawner
 
 ## Players by index (co-op rule: an array, never a singleton).
 var _players: Array[Tubbu] = []
@@ -29,8 +30,9 @@ func _ready() -> void:
 	arena.palette = PALETTE
 	add_child(arena)
 
-	# One manager for every projectile in the scene (players now, enemies at
-	# CP 1.5). Added before the players so ships draw above the bullet layer.
+	# One manager for every projectile in the scene — player shots and (CP 1.5)
+	# enemy bullets. It self-sets a high z_index so bullets draw ABOVE the ships:
+	# an incoming enemy orb must never hide under your own sprite (one-hit rule).
 	bullet_manager = BulletManager.new()
 	bullet_manager.palette = PALETTE
 	bullet_manager.bounds = arena.bounds()
@@ -47,6 +49,16 @@ func _ready() -> void:
 	spawner.bounds = arena.bounds()
 	add_child(spawner)
 
+	# Pattern shooters (Enemy 2): a steady few, weaving patterns under the swarm.
+	# Also after the players, so its enemy-bullet→player pass reads fresh ship
+	# positions (and fresh bullet positions, since the manager ticked first).
+	pattern_spawner = PatternSpawner.new()
+	pattern_spawner.players = _players
+	pattern_spawner.bullet_manager = bullet_manager
+	pattern_spawner.palette = PALETTE
+	pattern_spawner.bounds = arena.bounds()
+	add_child(pattern_spawner)
+
 	# Camera is arena-owned and follows player 0 (co-op frames N players later).
 	camera = ArenaCamera.new()
 	camera.target = player
@@ -56,6 +68,8 @@ func _ready() -> void:
 
 	var debug_panel := DebugPanel.new()
 	debug_panel.spawner = spawner
+	debug_panel.pattern_spawner = pattern_spawner
+	debug_panel.bullet_manager = bullet_manager
 	add_child(debug_panel)
 
 
@@ -74,8 +88,9 @@ func _process(_delta: float) -> void:
 
 ## The instant-restart loop (CP 1.4): wipe the board, ships fresh at center.
 func _restart() -> void:
-	bullet_manager.clear()
+	bullet_manager.clear()  # wipes both bands — no stray enemy orb kills the revive
 	spawner.clear()
+	pattern_spawner.clear()
 	for player in _players:
 		player.revive(arena.bounds().get_center())
 
