@@ -92,6 +92,35 @@ func active_player_bullet_count() -> int:
 	return _live_count
 
 
+## Collides every live player bullet against `targets` (anything with a
+## `global_position`) in one bullet-major pass: the first target within
+## `hit_radius` of a bullet eats it. A target eats at most one bullet per call
+## (it is dead after the first — a corpse must not soak later shots), and one
+## bullet kills at most one target (pierce is CP 2.5). Returns the targets hit.
+## Callers get nodes back, never slots — storage stays internal (CP 3.5).
+func collide_player_bullets(targets: Array, hit_radius: float) -> Array:
+	var hit: Array = []
+	if _live_count == 0 or targets.is_empty():
+		return hit
+	var remaining := targets.duplicate()
+	var radius_sq := hit_radius * hit_radius
+	for slot in PLAYER_BULLET_CAPACITY:
+		if _alive[slot] == 0:
+			continue
+		for i in remaining.size():
+			var target: Node2D = remaining[i]
+			if _pos[slot].distance_squared_to(target.global_position) <= radius_sq:
+				_release(slot)
+				hit.append(target)
+				remaining.remove_at(i)
+				break
+		if remaining.is_empty():
+			break
+	if not hit.is_empty():
+		queue_redraw()
+	return hit
+
+
 ## Despawns everything (room transitions, run resets).
 func clear() -> void:
 	for slot in PLAYER_BULLET_CAPACITY:

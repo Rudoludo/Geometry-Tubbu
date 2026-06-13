@@ -89,3 +89,44 @@ func test_owner_index_rides_with_the_bullet() -> void:
 	# Co-op rule: kill attribution needs the firing player's index.
 	_bm.spawn_player_bullet(1, Vector2.ZERO, Vector2.RIGHT)
 	assert_eq(_bm.debug_player_bullets()[0]["owner_index"], 1)
+
+
+# --- collide_player_bullets (CP 1.4) ----------------------------------------
+
+func _target_at(at: Vector2) -> Node2D:
+	var target := Node2D.new()
+	target.position = at
+	add_child_autofree(target)  # in-tree so global_position is valid
+	return target
+
+
+func test_collision_consumes_the_bullet_and_reports_the_target() -> void:
+	_bm.spawn_player_bullet(0, Vector2(50.0, 0.0), Vector2.RIGHT)
+	var target := _target_at(Vector2(52.0, 0.0))
+	var hits := _bm.collide_player_bullets([target], 10.0)
+	assert_eq(hits, [target])
+	assert_eq(_bm.active_player_bullet_count(), 0, "the hit eats the bullet")
+
+
+func test_collision_misses_outside_the_radius() -> void:
+	_bm.spawn_player_bullet(0, Vector2(50.0, 0.0), Vector2.RIGHT)
+	var hits := _bm.collide_player_bullets([_target_at(Vector2(200.0, 0.0))], 10.0)
+	assert_eq(hits.size(), 0)
+	assert_eq(_bm.active_player_bullet_count(), 1, "a miss costs nothing")
+
+
+func test_a_hit_target_soaks_no_further_bullets() -> void:
+	# One bullet kills it; the second must survive to hit whatever is behind.
+	_bm.spawn_player_bullet(0, Vector2(50.0, 0.0), Vector2.RIGHT)
+	_bm.spawn_player_bullet(0, Vector2(51.0, 0.0), Vector2.RIGHT)
+	var hits := _bm.collide_player_bullets([_target_at(Vector2(50.0, 0.0))], 10.0)
+	assert_eq(hits.size(), 1, "a target dies once")
+	assert_eq(_bm.active_player_bullet_count(), 1, "the corpse is not a shield")
+
+
+func test_one_bullet_kills_at_most_one_target() -> void:
+	# Pierce is a CP 2.5 upgrade, not a default.
+	_bm.spawn_player_bullet(0, Vector2(50.0, 0.0), Vector2.RIGHT)
+	var stacked := [_target_at(Vector2(50.0, 0.0)), _target_at(Vector2(51.0, 0.0))]
+	var hits := _bm.collide_player_bullets(stacked, 10.0)
+	assert_eq(hits.size(), 1, "no free pierce on overlapping targets")

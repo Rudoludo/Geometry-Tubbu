@@ -8,7 +8,13 @@ extends Node2D
 ## fallback) and the gun autofires per the design's trigger rule, spawning
 ## through the injected BulletManager. CP 1.3: dash — control-suspending
 ## impulse with i-frames (DashAbility), ghost body while dashing, and the body
-## glow refilling with the cooldown as the no-HUD readiness cue.
+## glow refilling with the cooldown as the no-HUD readiness cue. CP 1.4: one-hit
+## death (try_kill — the i-frame gate lives there, every killer goes through it)
+## and revive() for the instant-restart loop.
+##
+## PlayerInput is updated by Game once per frame (parents process first), so a
+## dead, non-processing ship still latches the restart edge; this node only
+## reads.
 
 # --- Movement tuning ------------------------------------------------------
 # One place on purpose (PLAN.md). CP 1.8 lifts these into a debug panel for the
@@ -36,12 +42,20 @@ const TRAIL_WIDTH := 6.0
 const DASH_GHOST_ALPHA := 0.4     ## body alpha during the dash window
 const DASH_REFILL_DIM := 0.55     ## body brightness right after a dash; 1 = ready
 
+# --- Death ------------------------------------------------------------------
+## The kill hitbox — deliberately tiny vs the ~16 px body (bullet-hell
+## convention, DESIGN.md hard-edge mitigation). Enemies add their own reach.
+const HIT_RADIUS := 6.0
+const DEATH_PARTICLES := 28
+const DEATH_BURST_SPEED := 520.0
+
 var player_index := 0
 var input: PlayerInput
 ## Injected by Game; null disables the gun (headless logic tests don't need it).
 var bullet_manager: BulletManager
 var velocity := Vector2.ZERO
 
+var _alive := true
 var _weapon := Weapon.new()
 var _dash := DashAbility.new()
 ## Dash fallback when the move stick is neutral: the last travel intent, never
@@ -74,9 +88,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if input == null:
+	if input == null or not _alive:
 		return
-	input.update()
 	var move := input.get_move_vector()
 	var aim := input.get_aim_vector(self)
 	_dash.tick(delta)
@@ -89,9 +102,44 @@ func _process(delta: float) -> void:
 	_update_trail()
 
 
-## CP 1.4's contact kill (and CP 1.5's bullets) check this before killing.
+## Dash i-frames (CP 1.3). Killers don't check this directly — try_kill does.
 func is_invulnerable() -> bool:
 	return _dash.is_invulnerable()
+
+
+func is_alive() -> bool:
+	return _alive
+
+
+## The one-hit death (CP 1.4). EVERY killer — chaser contact now, enemy
+## bullets at CP 1.5 — goes through here, so the i-frame rule can never be
+## forgotten at a call site. Reports whether the kill landed.
+func try_kill() -> bool:
+	if not _alive or is_invulnerable():
+		return false
+	_alive = false
+	velocity = Vector2.ZERO
+	visible = false  # hides the trail too (visibility is tree-wide; top_level only exempts transform)
+	if is_inside_tree() and skin != null:
+		Burst.spawn(get_parent(), global_position, skin.body_color,
+				DEATH_PARTICLES, DEATH_BURST_SPEED)
+	EventBus.player_died.emit(player_index)
+	return true
+
+
+## Back into play at `at`, fresh as spawned (instant-restart loop).
+func revive(at: Vector2) -> void:
+	_alive = true
+	visible = true
+	position = at
+	velocity = Vector2.ZERO
+	rotation = 0.0  # ships spawn facing +X
+	skew = 0.0
+	_last_move_dir = Vector2.RIGHT
+	_weapon = Weapon.new()
+	_dash = DashAbility.new()
+	if _trail != null:
+		_trail.clear_points()  # no ghost streak from the death spot
 
 
 func _move(delta: float, move: Vector2) -> void:

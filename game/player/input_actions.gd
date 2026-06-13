@@ -21,3 +21,5 @@ const AIM_UP := "aim_up"
 const AIM_DOWN := "aim_down"
 
 const DASH := "dash"
+
+const RESTART := "restart"

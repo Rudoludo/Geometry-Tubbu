@@ -29,6 +29,8 @@ var device_id := -1
 
 var _dash_pressed := false
 var _dash_just_pressed := false
+var _restart_pressed := false
+var _restart_just_pressed := false
 ## Ships spawn facing +X, so that's the degenerate-mouse fallback too.
 var _last_mouse_aim := Vector2.RIGHT
 
@@ -44,11 +46,14 @@ static func for_gamepad(joy_device_id: int) -> PlayerInput:
 	return input
 
 
-## Latches dash edges. Call once per frame, before reading.
+## Latches button edges. Call once per frame, before reading.
 func update() -> void:
-	var now_pressed := _read_dash_raw()
-	_dash_just_pressed = now_pressed and not _dash_pressed
-	_dash_pressed = now_pressed
+	var dash_now := _read_dash_raw()
+	_dash_just_pressed = dash_now and not _dash_pressed
+	_dash_pressed = dash_now
+	var restart_now := _read_restart_raw()
+	_restart_just_pressed = restart_now and not _restart_pressed
+	_restart_pressed = restart_now
 
 
 ## Movement intent, length 0..1, deadzoned.
@@ -97,6 +102,12 @@ func is_dash_just_pressed() -> bool:
 	return _dash_just_pressed
 
 
+## Instant-restart intent (CP 1.4). Read by Game, not the ship — restarting
+## resets the whole sandbox, but the *device* is still per-player (co-op rule).
+func is_restart_just_pressed() -> bool:
+	return _restart_just_pressed
+
+
 ## Radial deadzone with rescale: zero inside, then the remaining range maps to
 ## 0..1 — so deflection just past the deadzone starts gently instead of
 ## jumping. Pure math, unit-tested.
@@ -119,3 +130,10 @@ func _read_dash_raw() -> bool:
 		# Mirrors the dash action's pad binding in project.godot (RB = 10).
 		return Input.is_joy_button_pressed(device_id, JOY_BUTTON_RIGHT_SHOULDER)
 	return Input.is_action_pressed(InputActions.DASH)
+
+
+func _read_restart_raw() -> bool:
+	if device_kind == DeviceKind.GAMEPAD:
+		# Mirrors the restart action's pad binding in project.godot (Start = 6).
+		return Input.is_joy_button_pressed(device_id, JOY_BUTTON_START)
+	return Input.is_action_pressed(InputActions.RESTART)
