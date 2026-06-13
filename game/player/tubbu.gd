@@ -123,6 +123,12 @@ func is_invulnerable() -> bool:
 	return _dash.is_invulnerable()
 
 
+## The dash impulse window (CP 1.7). The grid backdrop polls this rising edge to
+## ripple on each dash; nothing about the kill gate routes through it.
+func is_dashing() -> bool:
+	return _dash.is_dashing()
+
+
 func is_alive() -> bool:
 	return _alive
 

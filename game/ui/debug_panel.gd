@@ -8,6 +8,7 @@ extends CanvasLayer
 var spawner: SandboxSpawner  # injected by Game
 var pattern_spawner: PatternSpawner  # injected by Game
 var bullet_manager: BulletManager  # injected by Game
+var grid: GridBackground  # injected by Game — toggled for A/B perf checks
 
 var _rate_label: Label
 var _count_label: Label
@@ -39,6 +40,12 @@ func _ready() -> void:
 	shooters_toggle.toggled.connect(_on_shooters_toggled)
 	column.add_child(shooters_toggle)
 
+	var grid_toggle := CheckButton.new()
+	grid_toggle.text = "warp grid"
+	grid_toggle.button_pressed = grid.visible
+	grid_toggle.toggled.connect(_on_grid_toggled)
+	column.add_child(grid_toggle)
+
 	_count_label = Label.new()
 	column.add_child(_count_label)
 	var hint := Label.new()
@@ -59,6 +66,13 @@ func _on_shooters_toggled(pressed: bool) -> void:
 	pattern_spawner.enabled = pressed
 	if not pressed:
 		pattern_spawner.clear()
+
+
+## Hide AND stop processing the grid, so toggling it off is a true A/B for the
+## perf check (no hidden sim cost while comparing framerates).
+func _on_grid_toggled(pressed: bool) -> void:
+	grid.visible = pressed
+	grid.set_process(pressed)
 
 
 func _on_rate_changed(value: float) -> void:

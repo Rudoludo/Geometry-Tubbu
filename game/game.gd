@@ -16,6 +16,7 @@ const DEFAULT_SKIN: SkinResource = preload("res://assets/skins/default_skin.tres
 const PALETTE: PaletteResource = preload("res://assets/palettes/default_palette.tres")
 
 var arena: Arena
+var grid: GridBackground
 var camera: ArenaCamera
 var bullet_manager: BulletManager
 var spawner: SandboxSpawner
@@ -31,6 +32,15 @@ func _ready() -> void:
 	arena = Arena.new()
 	arena.palette = PALETTE
 	add_child(arena)
+
+	# Reactive warp-grid backdrop (CP 1.7): a spring mesh drawn far behind
+	# everything (z -10). It shares the same _players array reference Game fills
+	# below — by the time it ripples on a wake/dash/death, player 0 is in it.
+	grid = GridBackground.new()
+	grid.palette = PALETTE
+	grid.players = _players
+	grid.setup(arena.bounds())
+	add_child(grid)
 
 	# One manager for every projectile in the scene — player shots and (CP 1.5)
 	# enemy bullets. It self-sets a high z_index so bullets draw ABOVE the ships:
@@ -76,6 +86,7 @@ func _ready() -> void:
 	debug_panel.spawner = spawner
 	debug_panel.pattern_spawner = pattern_spawner
 	debug_panel.bullet_manager = bullet_manager
+	debug_panel.grid = grid
 	add_child(debug_panel)
 
 
@@ -97,6 +108,7 @@ func _restart() -> void:
 	bullet_manager.clear()  # wipes both bands — no stray enemy orb kills the revive
 	spawner.clear()
 	pattern_spawner.clear()
+	grid.reset()  # flatten the mesh so the revive starts on a calm board
 	for player in _players:
 		player.revive(arena.bounds().get_center())
 
