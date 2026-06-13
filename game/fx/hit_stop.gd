@@ -1,28 +1,31 @@
 class_name HitStop
 extends Node
-## Brief time-freeze on impactful kills (CP 1.6) — the crunch that sells a hit.
-## Drops Engine.time_scale to near-zero for a few real milliseconds, then
-## restores it. Listens on EventBus: a tap per enemy kill (cooldown-gated so a
-## 50-kill swarm frame doesn't strobe into a slideshow) and a longer freeze on
-## player death.
+## Brief time-freeze that punctuates the biggest beats (CP 1.6). Drops
+## Engine.time_scale to near-zero for a few real milliseconds, then restores it.
 ##
-## Settings-scaled (SettingsStore.hitstop_intensity): 1.0 = full, 0 = off — the
-## "all intensities behind SettingsStore" rule. The freeze runs on REAL time
-## (Time.get_ticks_usec, immune to the scaled clock it just set), so it always
-## thaws even though it scaled time itself to a crawl.
+## Player death triggers it. Regular **enemy kills do NOT** — and that's the fix
+## for the "stutter on every death": in a swarm shooter you kill constantly, so a
+## 50 ms freeze per kill carpeted the whole combat loop in slow-mo. It fired on
+## its cooldown (~3 frozen frames, then ~5 normal, repeating at 60 fps), which
+## reads as the game lurching/stuttering whenever things die. Kills still get
+## their non-freezing juice — screenshake (ArenaCamera) + grid ripple
+## (GridBackground) + the death-pop particles — none of which slow time.
+##
+## When elite/boss kills arrive (CP 3.x) they can opt back in by calling
+## [method freeze] directly — selectively, never on every trash mob.
+##
+## Settings-scaled (SettingsStore.hitstop_intensity): 1.0 = full, 0 = off. The
+## freeze runs on REAL time (Time.get_ticks_usec, immune to the scaled clock it
+## just set), so it always thaws even though it scaled time itself to a crawl.
 
-const KILL_DURATION := 0.05    ## s real, per enemy kill
-const DEATH_DURATION := 0.18   ## s real, on player death — a bigger beat
+const DEATH_DURATION := 0.18   ## s real, on player death — the big beat
 const FROZEN_SCALE := 0.02     ## not 0: keep frames/audio ticking so we can thaw
-const KILL_COOLDOWN := 0.13    ## s real between kill taps — anti-strobe in a swarm
 
 var _frozen := false
 var _thaw_at_us := 0
-var _next_tap_at_us := 0
 
 
 func _ready() -> void:
-	EventBus.enemy_killed.connect(_on_enemy_killed)
 	EventBus.player_died.connect(_on_player_died)
 
 
@@ -40,19 +43,14 @@ func _exit_tree() -> void:
 		Engine.time_scale = 1.0
 
 
-func _on_enemy_killed(_at: Vector2) -> void:
-	var now := Time.get_ticks_usec()
-	if now < _next_tap_at_us:
-		return  # still cooling down — swallow this swarm kill's tap
-	_next_tap_at_us = now + int(KILL_COOLDOWN * 1_000_000.0)
-	_freeze(KILL_DURATION)
-
-
 func _on_player_died(_player_index: int) -> void:
-	_freeze(DEATH_DURATION)
+	freeze(DEATH_DURATION)
 
 
-func _freeze(duration: float) -> void:
+## Freeze real time for `duration` seconds (scaled by the setting). Public so a
+## future elite/boss-kill crunch can fire it selectively. Overlapping freezes
+## extend, never cut short.
+func freeze(duration: float) -> void:
 	var scale: float = SettingsStore.hitstop_intensity
 	if scale <= 0.0:
 		return
