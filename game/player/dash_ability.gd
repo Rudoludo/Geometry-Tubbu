@@ -13,6 +13,14 @@ const DASH_DURATION := 0.16   ## s of impulse
 const I_FRAMES := 0.16        ## s of invulnerability from dash start
 const COOLDOWN := 1.0         ## s from dash start to the next dash (~1 s per design)
 
+## Live feel knobs (CP 1.8 tuning panel), seeded from the consts above. CP 2.7's
+## cooldown-reduction / longer-i-frames upgrades land on these same fields.
+## Preserved across revive (Tubbu resets the clocks, not the instance).
+var dash_speed := DASH_SPEED
+var dash_duration := DASH_DURATION
+var i_frames := I_FRAMES
+var cooldown := COOLDOWN
+
 var _dash_left := 0.0
 var _iframes_left := 0.0
 var _cooldown_left := 0.0
@@ -32,9 +40,9 @@ func try_dash(direction: Vector2) -> bool:
 	if direction == Vector2.ZERO or _cooldown_left > 0.0:
 		return false
 	_direction = direction.normalized()
-	_dash_left = DASH_DURATION
-	_iframes_left = I_FRAMES
-	_cooldown_left = COOLDOWN
+	_dash_left = dash_duration
+	_iframes_left = i_frames
+	_cooldown_left = cooldown
 	return true
 
 
@@ -59,4 +67,15 @@ func direction() -> Vector2:
 ## 0 right after a dash, 1 when ready again — drives the no-HUD ship-glow
 ## refill feedback.
 func cooldown_fraction() -> float:
-	return 1.0 - _cooldown_left / COOLDOWN
+	if cooldown <= 0.0:
+		return 1.0
+	return 1.0 - _cooldown_left / cooldown
+
+
+## Clears the dash/i-frame/cooldown clocks without dropping tuning — the revive
+## reset (CP 1.8), so live dash tweaks survive death/restart.
+func reset() -> void:
+	_dash_left = 0.0
+	_iframes_left = 0.0
+	_cooldown_left = 0.0
+	_direction = Vector2.ZERO

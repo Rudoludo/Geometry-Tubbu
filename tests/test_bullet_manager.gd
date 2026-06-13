@@ -221,3 +221,25 @@ func test_enemy_bullet_ignores_a_corpse() -> void:
 	var kills := _bm.collide_enemy_bullets_with_players([player], 10.0)
 	assert_eq(kills, 0, "a dead player can't be killed again")
 	assert_eq(_bm.active_enemy_bullet_count(), 1, "and the orb is not consumed")
+
+
+# --- nearest_enemy_bullet (CP 1.8 near-miss query) --------------------------
+
+func test_nearest_enemy_bullet_none_when_empty() -> void:
+	assert_false(_bm.nearest_enemy_bullet(Vector2.ZERO)["found"], "no orbs, no graze")
+
+
+func test_nearest_enemy_bullet_picks_the_closest() -> void:
+	_bm.spawn_enemy_bullet(Vector2(100.0, 0.0), Vector2(0.0, 50.0))
+	_bm.spawn_enemy_bullet(Vector2(20.0, 0.0), Vector2(0.0, 50.0))   # closest
+	_bm.spawn_enemy_bullet(Vector2(0.0, 60.0), Vector2(50.0, 0.0))
+	var near := _bm.nearest_enemy_bullet(Vector2.ZERO)
+	assert_true(near["found"])
+	assert_eq(near["position"], Vector2(20.0, 0.0))
+	assert_almost_eq(near["distance"], 20.0, 0.001)
+
+
+func test_nearest_enemy_bullet_ignores_the_player_band() -> void:
+	# A graze is enemy fire only; the player's own shots must not trigger it.
+	_bm.spawn_player_bullet(0, Vector2(5.0, 0.0), Vector2.RIGHT)
+	assert_false(_bm.nearest_enemy_bullet(Vector2.ZERO)["found"])

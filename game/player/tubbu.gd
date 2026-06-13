@@ -10,15 +10,18 @@ extends Node2D
 ## impulse with i-frames (DashAbility), ghost body while dashing, and the body
 ## glow refilling with the cooldown as the no-HUD readiness cue. CP 1.4: one-hit
 ## death (try_kill — the i-frame gate lives there, every killer goes through it)
-## and revive() for the instant-restart loop.
+## and revive() for the instant-restart loop. CP 1.8: personality — an idle
+## squash/bob/blink (IdleAnimation, faded out as it moves) and a near-miss
+## flinch + spark (NearMissReaction); key feel knobs are live-tunable.
 ##
 ## PlayerInput is updated by Game once per frame (parents process first), so a
 ## dead, non-processing ship still latches the restart edge; this node only
 ## reads.
 
 # --- Movement tuning ------------------------------------------------------
-# One place on purpose (PLAN.md). CP 1.8 lifts these into a debug panel for the
-# feel-gate tuning session; until then, edit here.
+# Consts are the defaults; CP 1.8's feel-gate panel writes the live vars below
+# (preserved across revive). The other consts here are shape/feel, not feel-gate
+# knobs, so they stay const.
 const MAX_SPEED := 560.0          ## px/s top speed
 const ACCELERATION := 4200.0      ## px/s^2 toward the input target velocity
 const FRICTION := 3000.0          ## px/s^2 toward rest when there's no input
@@ -42,12 +45,36 @@ const TRAIL_WIDTH := 6.0
 const DASH_GHOST_ALPHA := 0.4     ## body alpha during the dash window
 const DASH_REFILL_DIM := 0.55     ## body brightness right after a dash; 1 = ready
 
+# --- Near-miss reaction (CP 1.8) --------------------------------------------
+## A graze: an enemy bullet whose centre is within GRAZE_RADIUS of the ship but
+## beyond the lethal radius (a true miss) sparks a flinch. The outer edge is
+## generous so a wake of fire registers; the inner edge is the kill radius, so a
+## graze never overlaps a hit (the kill pass owns those). `closeness` runs 1 at
+## the kill edge to 0 at GRAZE_RADIUS, scaling the flinch and feeding the spark.
+const GRAZE_RADIUS := 34.0
+const GRAZE_SPARK_PARTICLES := 6
+const GRAZE_SPARK_SPEED := 150.0
+const FLINCH_BRIGHTNESS := 0.7    ## body brightness spike at a full flinch
+const FLINCH_SCALE := 0.14        ## body scale pop at a full flinch
+
+# --- Idle personality (CP 1.8) ----------------------------------------------
+## The bob/breathe fade out between these speeds, so the idle animation only
+## plays when Tubbu is calm and never wrestles with the flight feel.
+const IDLE_SPEED_FULL := 30.0     ## px/s at/below which idle anim is full
+const IDLE_SPEED_NONE := 160.0    ## px/s at/above which it is off
+const EYE_SEGMENTS := 12          ## ellipse resolution for the (blinking) eye
+
 # --- Death ------------------------------------------------------------------
 ## The kill hitbox — deliberately tiny vs the ~16 px body (bullet-hell
 ## convention, DESIGN.md hard-edge mitigation). Enemies add their own reach.
 const HIT_RADIUS := 6.0
 const DEATH_PARTICLES := 28
 const DEATH_BURST_SPEED := 520.0
+
+## Live movement feel knobs (CP 1.8 panel), seeded from the consts above.
+var max_speed := MAX_SPEED
+var acceleration := ACCELERATION
+var friction := FRICTION
 
 var player_index := 0
 var input: PlayerInput
@@ -61,6 +88,10 @@ var velocity := Vector2.ZERO
 var _alive := true
 var _weapon := Weapon.new()
 var _dash := DashAbility.new()
+## Personality (CP 1.8): the idle squash/bob/blink curves and the near-miss
+## flinch clock. Pure + owner-ticked, like _weapon/_dash.
+var _idle := IdleAnimation.new()
+var _reaction := NearMissReaction.new()
 ## Dash fallback when the move stick is neutral: the last travel intent, never
 ## the aim ("aim-neutral" per plan — you dodge along your motion, not your
 ## gun). Ships spawn facing +X, hence the default.
@@ -109,13 +140,19 @@ func _process(delta: float) -> void:
 	var move := input.get_move_vector()
 	var aim := input.get_aim_vector(self)
 	_dash.tick(delta)
+	_idle.tick(delta)
+	_reaction.tick(delta)
 	if input.is_dash_just_pressed():
 		_dash.try_dash(move if move != Vector2.ZERO else _last_move_dir)
 	_move(delta, move)
 	_update_heading(delta, aim)
 	_update_fire(delta, aim)
-	_update_dash_visual()
+	_check_near_miss()
+	_update_body_visual()
 	_update_trail()
+	# The idle breathe/bob/blink and the flinch animate the drawn body, so it
+	# redraws every frame while in play (a tiny polyline + eye — negligible).
+	queue_redraw()
 
 
 ## Dash i-frames (CP 1.3). Killers don't check this directly — try_kill does.
@@ -131,6 +168,17 @@ func is_dashing() -> bool:
 
 func is_alive() -> bool:
 	return _alive
+
+
+## Owned sub-objects, exposed for the CP 1.8 feel-tuning panel. Object identity
+## is stable across revive (revive resets their clocks, not the instances), so a
+## panel reference and any live tweak both survive the restart loop.
+func weapon() -> Weapon:
+	return _weapon
+
+
+func dash() -> DashAbility:
+	return _dash
 
 
 ## The one-hit death (CP 1.4). EVERY killer — chaser contact now, enemy
@@ -162,8 +210,11 @@ func revive(at: Vector2) -> void:
 	rotation = 0.0  # ships spawn facing +X
 	skew = 0.0
 	_last_move_dir = Vector2.RIGHT
-	_weapon = Weapon.new()
-	_dash = DashAbility.new()
+	# Reset the clocks but keep the same instances — so a live tuning tweak
+	# (CP 1.8 panel) survives the death/restart loop.
+	_weapon.reset()
+	_dash.reset()
+	_reaction = NearMissReaction.new()  # no tuning to keep; drop any stale flinch
 	if _trail != null:
 		_trail.clear_points()  # no ghost streak from the death spot
 
@@ -174,11 +225,11 @@ func _move(delta: float, move: Vector2) -> void:
 	if _dash.is_dashing():
 		# Control is suspended for the burst. On exit the high velocity stays
 		# and friction/accel reclaims it, which reads as a glide out.
-		velocity = _dash.direction() * DashAbility.DASH_SPEED
+		velocity = _dash.direction() * _dash.dash_speed
 	elif move == Vector2.ZERO:
-		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
+		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
 	else:
-		velocity = velocity.move_toward(move * MAX_SPEED, ACCELERATION * delta)
+		velocity = velocity.move_toward(move * max_speed, acceleration * delta)
 	position += velocity * delta
 	if move_bounds.has_area():
 		var resolved := Arena.slide_inside(
@@ -225,20 +276,50 @@ func _update_fire(delta: float, aim: Vector2) -> void:
 			_muzzle.rotation = dir.angle()
 
 
-func _update_dash_visual() -> void:
+## A graze (CP 1.8): the nearest enemy bullet skimming the ship — beyond the
+## lethal radius but inside GRAZE_RADIUS — sparks a flinch, once per cooldown.
+## Hits are the kill pass's job; this only reacts to true misses.
+func _check_near_miss() -> void:
+	if bullet_manager == null:
+		return
+	var nearest := bullet_manager.nearest_enemy_bullet(global_position)
+	if not nearest["found"]:
+		return
+	var dist: float = nearest["distance"]
+	var lethal := HIT_RADIUS + BulletManager.ENEMY_BULLET_RADIUS
+	if dist <= lethal or dist > GRAZE_RADIUS:
+		return
+	var closeness := clampf(inverse_lerp(GRAZE_RADIUS, lethal, dist), 0.0, 1.0)
+	if _reaction.graze(closeness) and is_inside_tree() and palette != null:
+		# One-shot spark on the grazing orb, in the threat colour (asset rule).
+		Burst.spawn(get_parent(), nearest["position"], palette.enemy_bullet_color,
+				GRAZE_SPARK_PARTICLES, GRAZE_SPARK_SPEED)
+
+
+## Composes the body's colour: the dash ghost/cooldown-refill brightness (CP 1.3)
+## plus a near-miss flinch spark (CP 1.8). The idle/flinch *transform* is applied
+## in _draw; this owns self_modulate.
+func _update_body_visual() -> void:
 	var dashing := _dash.is_dashing()
-	if dashing:
-		# Ghost: the body fades while the trail keeps burning.
-		self_modulate = Color(1.0, 1.0, 1.0, DASH_GHOST_ALPHA)
-	else:
-		# Readiness without HUD: the body glow refills with the cooldown.
-		var brightness := lerpf(DASH_REFILL_DIM, 1.0, _dash.cooldown_fraction())
-		self_modulate = Color(brightness, brightness, brightness, 1.0)
+	var alpha := DASH_GHOST_ALPHA if dashing else 1.0
+	# Body glow: full during the dash ghost, else refilling with the cooldown.
+	var brightness := 1.0 if dashing else lerpf(DASH_REFILL_DIM, 1.0, _dash.cooldown_fraction())
+	# Flinch spark on top, settings-scaled (the flash readability knob).
+	brightness += _reaction.intensity() * FLINCH_BRIGHTNESS * SettingsStore.flash_intensity
+	self_modulate = Color(brightness, brightness, brightness, alpha)
 	if _dash_trail != null:
 		# Afterimage puffs left in world space as the ship rockets off.
 		_dash_trail.emitting = dashing
 		if dashing:
 			_dash_trail.global_position = global_position
+
+
+## 1 when nearly still, fading to 0 once moving — gates the idle bob/breathe so
+## the personality never fights the flight feel.
+func _idle_factor() -> float:
+	var speed := velocity.length()
+	return clampf(1.0 - (speed - IDLE_SPEED_FULL) / (IDLE_SPEED_NONE - IDLE_SPEED_FULL),
+			0.0, 1.0)
 
 
 func _update_trail() -> void:
@@ -253,7 +334,15 @@ func _update_trail() -> void:
 
 
 func _apply_skin() -> void:
-	if _trail == null or skin == null:
+	if skin == null:
+		return
+	# Personality amplitudes are per-skin (CP 1.8); set them even out of the tree
+	# (the trail block below is the only part that needs the built node).
+	_idle.bob_amplitude = skin.idle_bob
+	_idle.breathe_amplitude = skin.idle_breathe
+	_idle.cycle_time = skin.idle_cycle
+	_idle.blink_interval = skin.blink_interval
+	if _trail == null:
 		return
 	var grad := Gradient.new()
 	grad.set_color(0, skin.trail_color)                 # newest point: full
@@ -268,6 +357,36 @@ func _apply_skin() -> void:
 func _draw() -> void:
 	if skin == null or skin.body_points.size() < 3:
 		return
+	# Idle personality (CP 1.8): a squash/stretch breathe + a world-space bob,
+	# faded by how still the ship is, plus a brief scale pop on a near-miss
+	# flinch. Applied as one extra draw transform so the body (and its eye) ride
+	# on top of the node's facing/banking; the bob is counter-rotated so it stays
+	# world-vertical regardless of which way Tubbu faces.
+	var idle := _idle_factor()
+	var breathe := _idle.breathe() * idle
+	var pop := _reaction.intensity() * FLINCH_SCALE
+	var body_scale := Vector2(1.0 + breathe + pop, 1.0 - breathe + pop)
+	var bob := Vector2(0.0, _idle.bob() * idle).rotated(-rotation)
+	draw_set_transform(bob, 0.0, body_scale)
+
 	var outline := skin.body_points.duplicate()
 	outline.append(outline[0])  # close the loop
 	draw_polyline(outline, skin.body_color, 2.0, true)
+	_draw_eye()
+
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## A filled eye that blinks (CP 1.8): an ellipse squashed vertically toward a
+## line as the blink openness drops. Drawn under the idle transform above so it
+## breathes/bobs with the body; uses the skin's body colour (no new colours).
+func _draw_eye() -> void:
+	if skin.eye_radius <= 0.0:
+		return
+	var rx := skin.eye_radius
+	var ry := maxf(skin.eye_radius * _idle.blink_openness(), 0.4)
+	var eye := PackedVector2Array()
+	for i in EYE_SEGMENTS:
+		var a := TAU * i / EYE_SEGMENTS
+		eye.append(skin.eye_offset + Vector2(cos(a) * rx, sin(a) * ry))
+	draw_colored_polygon(eye, skin.body_color)

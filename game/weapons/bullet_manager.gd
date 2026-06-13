@@ -234,6 +234,25 @@ func collide_enemy_bullets_with_players(players: Array, hit_radius: float) -> in
 	return kills
 
 
+## Nearest live enemy bullet to `point`, for Tubbu's near-miss graze check
+## (CP 1.8). Read-only — it consumes nothing. Returns {"found": false} or
+## {"found": true, "position": Vector2, "distance": float}. O(n) over the enemy
+## band; cheap with the player count this game runs.
+func nearest_enemy_bullet(point: Vector2) -> Dictionary:
+	var best_sq := INF
+	var best := Vector2.ZERO
+	for slot in _enemy.capacity:
+		if _enemy.alive[slot] == 0:
+			continue
+		var d_sq := _enemy.pos[slot].distance_squared_to(point)
+		if d_sq < best_sq:
+			best_sq = d_sq
+			best = _enemy.pos[slot]
+	if best_sq == INF:
+		return {"found": false}
+	return {"found": true, "position": best, "distance": sqrt(best_sq)}
+
+
 ## Despawns everything in both bands (room transitions, run resets).
 func clear() -> void:
 	_player.clear()

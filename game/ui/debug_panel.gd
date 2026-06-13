@@ -1,14 +1,17 @@
 class_name DebugPanel
 extends CanvasLayer
-## Sandbox tuning surface (CP 1.4): spawn-rate slider + live readouts.
-## Debug-only chrome — CP 2.1 moves it behind a debug flag, CP 1.8 grows it
-## into the feel-tuning panel. Plain default controls on purpose: the one-Theme
-## UI rule applies to real game UI, and this never ships.
+## Sandbox tuning surface. CP 1.4 gave it the spawn-rate slider + live readouts;
+## CP 1.8 grows it into the feel-gate tuning panel — live knobs for the key feel
+## consts (speeds, fire rate, dash, shake) so Ludo can dial in the fun without a
+## recompile. Debug-only chrome (CP 2.1 moves it behind a debug flag). Plain
+## default controls on purpose: the one-Theme UI rule is for real game UI, and
+## this never ships.
 
 var spawner: SandboxSpawner  # injected by Game
 var pattern_spawner: PatternSpawner  # injected by Game
 var bullet_manager: BulletManager  # injected by Game
 var grid: GridBackground  # injected by Game — toggled for A/B perf checks
+var players: Array[Tubbu] = []  # injected by Game — the feel knobs write to these
 
 var _rate_label: Label
 var _count_label: Label
@@ -46,6 +49,8 @@ func _ready() -> void:
 	grid_toggle.toggled.connect(_on_grid_toggled)
 	column.add_child(grid_toggle)
 
+	_build_feel_knobs(column)
+
 	_count_label = Label.new()
 	column.add_child(_count_label)
 	var hint := Label.new()
@@ -60,6 +65,63 @@ func _process(_delta: float) -> void:
 		pattern_spawner.live_count(),
 		bullet_manager.active_enemy_bullet_count(),
 	]
+
+
+## The CP 1.8 feel-gate knobs. Each writes to every player (co-op-safe) or, for
+## shake, to the setting the camera reads live. Seeded from player 0's current
+## values; the writes ride the stable Weapon/DashAbility instances, so they
+## survive the death/restart loop.
+func _build_feel_knobs(column: VBoxContainer) -> void:
+	if players.is_empty():
+		return
+	var p := players[0]
+	_add_separator(column)
+	_add_slider(column, "move speed: %.0f", 200.0, 900.0, 10.0, p.max_speed,
+			func(v: float) -> void:
+				for player in players:
+					player.max_speed = v)
+	_add_slider(column, "friction: %.0f", 500.0, 6000.0, 100.0, p.friction,
+			func(v: float) -> void:
+				for player in players:
+					player.friction = v)
+	_add_slider(column, "fire rate: %.1f/s", 1.0, 20.0, 0.5, p.weapon().fire_rate,
+			func(v: float) -> void:
+				for player in players:
+					player.weapon().fire_rate = v)
+	_add_slider(column, "dash speed: %.0f", 600.0, 2400.0, 50.0, p.dash().dash_speed,
+			func(v: float) -> void:
+				for player in players:
+					player.dash().dash_speed = v)
+	_add_slider(column, "dash cooldown: %.2fs", 0.2, 2.0, 0.05, p.dash().cooldown,
+			func(v: float) -> void:
+				for player in players:
+					player.dash().cooldown = v)
+	_add_slider(column, "shake: %.2f", 0.0, 1.0, 0.05, SettingsStore.screenshake_intensity,
+			func(v: float) -> void:
+				SettingsStore.set_value(&"screenshake_intensity", v))
+	_add_separator(column)
+
+
+## A labelled slider: the label shows the live value via `fmt` (one %-token).
+func _add_slider(column: VBoxContainer, fmt: String, min_v: float, max_v: float,
+		step: float, value: float, on_change: Callable) -> void:
+	var label := Label.new()
+	column.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = min_v
+	slider.max_value = max_v
+	slider.step = step
+	slider.value = value
+	column.add_child(slider)
+	var update := func(v: float) -> void:
+		label.text = fmt % v
+		on_change.call(v)
+	slider.value_changed.connect(update)
+	update.call(value)  # set the initial label without re-reading the slider
+
+
+func _add_separator(column: VBoxContainer) -> void:
+	column.add_child(HSeparator.new())
 
 
 func _on_shooters_toggled(pressed: bool) -> void:

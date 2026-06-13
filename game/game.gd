@@ -87,6 +87,7 @@ func _ready() -> void:
 	debug_panel.pattern_spawner = pattern_spawner
 	debug_panel.bullet_manager = bullet_manager
 	debug_panel.grid = grid
+	debug_panel.players = _players  # CP 1.8 feel knobs write to the live players
 	add_child(debug_panel)
 
 
