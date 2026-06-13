@@ -15,10 +15,10 @@ const MOVE_RIGHT := "move_right"
 const MOVE_UP := "move_up"
 const MOVE_DOWN := "move_down"
 
-const AIM_LEFT := "aim_left"
-const AIM_RIGHT := "aim_right"
-const AIM_UP := "aim_up"
-const AIM_DOWN := "aim_down"
+## kb+m fire button (issue #3): hold to shoot. Gamepad has no fire action —
+## the right stick IS the trigger (PlayerInput.is_fire_held). There are no
+## `aim_*` actions either: gamepad aim is read raw per-device in PlayerInput.
+const FIRE := "fire"
 
 const DASH := "dash"
 

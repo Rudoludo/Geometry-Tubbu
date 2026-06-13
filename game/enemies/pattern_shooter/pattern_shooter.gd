@@ -16,12 +16,12 @@ const MAX_HP := 8                 ## survives long enough to be a pattern, not a
 const BULLET_HIT_RADIUS := 18.0   ## generous vs the body; > the per-frame bullet step
 const MUZZLE_OFFSET := 24.0       ## bullets leave the rim, never the player-kill radius
 
-const RING_COUNT := 10            ## bullets per ring volley
+const RING_COUNT := 12            ## bullets per ring volley (issue #2: denser)
 const RING_INTERVAL := 1.5        ## s between rings
 const RING_PHASE_STEP := 0.32     ## rad each ring rotates — the readable spiral
 const RING_BULLET_SPEED := 230.0  ## px/s — slow & visible
 
-const BURST_COUNT := 3            ## bullets per aimed burst
+const BURST_COUNT := 4            ## bullets per aimed burst (issue #2: denser)
 const BURST_SPREAD := 0.42        ## rad fan width (~24 deg)
 const BURST_INTERVAL := 2.5       ## s between bursts
 const BURST_BULLET_SPEED := 320.0 ## px/s — the aimed shot presses harder

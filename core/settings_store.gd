@@ -11,6 +11,17 @@ extends Node
 
 signal changed(key: StringName, value: Variant)
 
+# Input device family (issues #1/#3/#4). Plain ints (not a game/ enum) so this
+# core autoload imports nothing from game/; the values mirror PlayerInput.Mode
+# and Game maps input_mode -> the bound PlayerInput. AUTO follows the last-used
+# device; the explicit modes lock one family so the other can't bleed in.
+const INPUT_MODE_AUTO := 0
+const INPUT_MODE_KB_MOUSE := 1
+const INPUT_MODE_GAMEPAD := 2
+var input_mode: int = INPUT_MODE_AUTO
+## kb+m only: false = hold left mouse to fire; true = always-on autofire.
+var autofire: bool = false
+
 # Effect intensities (0..1 scalars; 1.0 = full as authored, 0 = off).
 var screenshake_intensity: float = 1.0
 var hitstop_intensity: float = 1.0   ## scales the kill/death time-freeze (CP 1.6)

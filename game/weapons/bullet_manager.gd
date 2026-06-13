@@ -27,10 +27,12 @@ const PLAYER_BULLET_CAPACITY := 256
 ## the shooter's call (it passes a full velocity), so patterns can vary it.
 const ENEMY_BULLET_TTL := 8.0         ## s backstop; arena walls cull first
 const ENEMY_BULLET_CAPACITY := 512    ## dense patterns + slow bullets accumulate
-## Lethal contribution added to the player's tiny hitbox. The visual disc below
-## is bigger than this sum is over the body, so bullets can clip the ship's
-## wireframe without killing — the grazing window (bullet-hell convention).
-const ENEMY_BULLET_RADIUS := 4.0
+## Lethal contribution added to the player's tiny hitbox. Bumped (issue #2:
+## bullets were too easy to dodge vs the contact swarm) so the lethal sum
+## (HIT_RADIUS 6 + this = 13) bites without touching the player's deliberately
+## tiny body hitbox. Still well inside the ~16 px wireframe and below the graze
+## band (GRAZE_RADIUS 34), so the grazing window survives and bullets stay fair.
+const ENEMY_BULLET_RADIUS := 7.0
 
 # --- Player streak rendering (palette-driven; CP 1.6 juices this) ------------
 const STREAK_LENGTH := 14.0   ## px tracer tail behind the bullet head
@@ -41,7 +43,7 @@ const CORE_RADIUS := 2.5
 # --- Enemy orb rendering ----------------------------------------------------
 ## Deliberately unlike the player's fast streaks: a slow, round, soft-edged orb
 ## so an incoming threat is never confused with your own fire (readability rule).
-const ENEMY_DRAW_RADIUS := 6.5   ## visual disc; > the hitbox so you can graze
+const ENEMY_DRAW_RADIUS := 8.0   ## visual disc; tracks the bigger hitbox (issue #2)
 const ENEMY_CORE_RADIUS := 2.5
 const ENEMY_HALO_ALPHA := 0.4
 

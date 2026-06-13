@@ -49,6 +49,7 @@ func _ready() -> void:
 	grid_toggle.toggled.connect(_on_grid_toggled)
 	column.add_child(grid_toggle)
 
+	_build_input_controls(column)
 	_build_feel_knobs(column)
 
 	_count_label = Label.new()
@@ -65,6 +66,32 @@ func _process(_delta: float) -> void:
 		pattern_spawner.live_count(),
 		bullet_manager.active_enemy_bullet_count(),
 	]
+
+
+## Input controls (issues #3/#4): pick the device family and toggle kb+m
+## autofire. Both write through SettingsStore; Game listens on `changed` and
+## re-binds every player's PlayerInput live (the real settings menu is CP 4.4).
+func _build_input_controls(column: VBoxContainer) -> void:
+	_add_separator(column)
+
+	var mode_label := Label.new()
+	mode_label.text = "input device"
+	column.add_child(mode_label)
+	var mode_pick := OptionButton.new()
+	mode_pick.add_item("auto (last used)", SettingsStore.INPUT_MODE_AUTO)
+	mode_pick.add_item("keyboard + mouse", SettingsStore.INPUT_MODE_KB_MOUSE)
+	mode_pick.add_item("gamepad", SettingsStore.INPUT_MODE_GAMEPAD)
+	mode_pick.select(mode_pick.get_item_index(SettingsStore.input_mode))
+	mode_pick.item_selected.connect(func(idx: int) -> void:
+		SettingsStore.set_value(&"input_mode", mode_pick.get_item_id(idx)))
+	column.add_child(mode_pick)
+
+	var autofire_toggle := CheckButton.new()
+	autofire_toggle.text = "autofire (kb+m)"
+	autofire_toggle.button_pressed = SettingsStore.autofire
+	autofire_toggle.toggled.connect(func(on: bool) -> void:
+		SettingsStore.set_value(&"autofire", on))
+	column.add_child(autofire_toggle)
 
 
 ## The CP 1.8 feel-gate knobs. Each writes to every player (co-op-safe) or, for

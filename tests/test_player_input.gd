@@ -5,6 +5,7 @@ extends GutTest
 
 func after_each() -> void:
 	Input.action_release(InputActions.DASH)
+	Input.action_release(InputActions.FIRE)
 
 
 func test_keyboard_mouse_binding() -> void:
@@ -44,12 +45,41 @@ func test_gamepad_stick_is_the_trigger() -> void:
 	assert_true(input.is_fire_held(Vector2(0.3, 0.0)), "deflected stick fires")
 
 
-func test_kbm_autofire_is_always_on() -> void:
-	# Design rule: kb+m has no trigger — the mouse aims, fire never stops.
+func test_kbm_fire_follows_the_fire_button() -> void:
+	# Issue #3: kb+m fires only while the FIRE button (left mouse) is held.
 	var input := PlayerInput.for_keyboard_mouse()
-	assert_true(input.is_fire_held(Vector2.RIGHT))
+	assert_false(input.is_fire_held(Vector2.RIGHT), "idle gun does not fire")
+	Input.action_press(InputActions.FIRE)
+	assert_true(input.is_fire_held(Vector2.RIGHT), "held fire button shoots")
+	Input.action_release(InputActions.FIRE)
+	assert_false(input.is_fire_held(Vector2.RIGHT), "release stops the gun")
+
+
+func test_kbm_autofire_toggle_forces_fire() -> void:
+	# Issue #3: the opt-in autofire toggle restores always-on kb+m fire.
+	var input := PlayerInput.for_keyboard_mouse()
+	input.autofire = true
 	assert_true(input.is_fire_held(Vector2.ZERO),
-		"even a degenerate aim must not silence the kb+m gun")
+		"autofire fires with no button and even a degenerate aim")
+
+
+func test_explicit_modes_lock_the_device_family() -> void:
+	# Issue #4: an explicitly chosen family stays put (no auto-switch).
+	var kbm := PlayerInput.for_keyboard_mouse()
+	assert_eq(kbm.mode, PlayerInput.Mode.KEYBOARD_MOUSE)
+	kbm.use_gamepad(3)
+	assert_eq(kbm.mode, PlayerInput.Mode.GAMEPAD)
+	assert_eq(kbm.device_kind, PlayerInput.DeviceKind.GAMEPAD)
+	assert_eq(kbm.device_id, 3)
+
+
+func test_auto_mode_starts_sticky_and_does_not_error() -> void:
+	# AUTO resolves the active family from device activity each update(); headless
+	# with no input it keeps its current (default kb+m) family and never errors.
+	var input := PlayerInput.for_auto()
+	assert_eq(input.mode, PlayerInput.Mode.AUTO)
+	input.update()
+	assert_eq(input.device_kind, PlayerInput.DeviceKind.KEYBOARD_MOUSE)
 
 
 func test_kbm_dash_edge_latching() -> void:

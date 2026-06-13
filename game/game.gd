@@ -42,6 +42,10 @@ var _run_lost_emitted := false
 func _ready() -> void:
 	_setup_glow()
 
+	# Re-bind every player's input when the device-mode / autofire setting changes
+	# (debug panel now, settings menu at CP 4.4), so the choice takes effect live.
+	SettingsStore.changed.connect(_on_setting_changed)
+
 	arena = Arena.new()
 	arena.palette = PALETTE
 	add_child(arena)
@@ -141,7 +145,11 @@ func _spawn_player(player_index: int) -> Tubbu:
 	# kb+m binding. The move/dash actions also carry device -1 joypad events
 	# (project.godot), so in single-player a connected pad drives this binding
 	# too; true per-device assignment is the co-op feature, not v1.
-	tubbu.input = PlayerInput.for_keyboard_mouse()
+	# Bound per the input-mode setting (issues #1/#3/#4). Default AUTO follows the
+	# last-used device, so the right stick aims the moment you pick up a pad and
+	# the keyboard goes quiet — no more both-at-once.
+	tubbu.input = PlayerInput.for_auto()
+	_configure_input(tubbu.input)
 	tubbu.skin = DEFAULT_SKIN
 	tubbu.bullet_manager = bullet_manager
 	tubbu.palette = PALETTE  # muzzle FX reads the bullet color (CP 1.6)
@@ -151,6 +159,33 @@ func _spawn_player(player_index: int) -> Tubbu:
 	_players.append(tubbu)
 	EventBus.player_spawned.emit(player_index)
 	return tubbu
+
+
+## Binds a PlayerInput to the device family chosen in SettingsStore (issue #4)
+## and applies the autofire toggle (issue #3). The int->mode map lives here so
+## the core SettingsStore autoload stays free of any game/ import.
+func _configure_input(pi: PlayerInput) -> void:
+	pi.autofire = SettingsStore.autofire
+	match SettingsStore.input_mode:
+		SettingsStore.INPUT_MODE_KB_MOUSE:
+			pi.use_keyboard_mouse()
+		SettingsStore.INPUT_MODE_GAMEPAD:
+			pi.use_gamepad(_first_connected_pad())
+		_:
+			pi.use_auto()
+
+
+## First connected pad for an explicit GAMEPAD binding; 0 if none is plugged in
+## yet (it will read neutral until one appears — no error).
+func _first_connected_pad() -> int:
+	var pads := Input.get_connected_joypads()
+	return pads[0] if not pads.is_empty() else 0
+
+
+func _on_setting_changed(key: StringName, _value: Variant) -> void:
+	if key == &"input_mode" or key == &"autofire":
+		for player in _players:
+			_configure_input(player.input)
 
 
 ## Neon bloom (CP 1.6): HDR 2D is on (project setting), so only the overbright
