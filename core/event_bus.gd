@@ -13,3 +13,8 @@ extends Node
 
 signal player_spawned(player_index: int)
 signal player_died(player_index: int)
+
+## An enemy died to player fire (CP 1.6). No single owner — juice (screenshake,
+## hit-stop), and later scoring (CP 3.1) and audio all react. Carries the death
+## position for placed FX; player attribution lands with scoring.
+signal enemy_killed(at: Vector2)

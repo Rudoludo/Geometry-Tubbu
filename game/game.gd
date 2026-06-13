@@ -26,6 +26,8 @@ var _players: Array[Tubbu] = []
 
 
 func _ready() -> void:
+	_setup_glow()
+
 	arena = Arena.new()
 	arena.palette = PALETTE
 	add_child(arena)
@@ -65,6 +67,10 @@ func _ready() -> void:
 	camera.setup_limits(arena.bounds())
 	add_child(camera)
 	camera.make_current()
+
+	# Juice (CP 1.6): the crunch on kills/death. Shake lives on the camera; this
+	# owns the global time-freeze. Both are settings-scaled and event-driven.
+	add_child(HitStop.new())
 
 	var debug_panel := DebugPanel.new()
 	debug_panel.spawner = spawner
@@ -106,9 +112,31 @@ func _spawn_player(player_index: int) -> Tubbu:
 	tubbu.input = PlayerInput.for_keyboard_mouse()
 	tubbu.skin = DEFAULT_SKIN
 	tubbu.bullet_manager = bullet_manager
+	tubbu.palette = PALETTE  # muzzle FX reads the bullet color (CP 1.6)
 	tubbu.move_bounds = arena.bounds()
 	tubbu.position = arena.bounds().get_center()
 	add_child(tubbu)
 	_players.append(tubbu)
 	EventBus.player_spawned.emit(player_index)
 	return tubbu
+
+
+## Neon bloom (CP 1.6): HDR 2D is on (project setting), so only the overbright
+## (>1.0) palette/skin colors cross the glow threshold and bloom — the dark
+## background and UI stay crisp. First-pass tuning; final look is Ludo's call.
+func _setup_glow() -> void:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_CANVAS  # keep the 2D scene as the backdrop
+	env.glow_enabled = true
+	env.glow_normalized = true
+	env.glow_intensity = 1.0
+	env.glow_strength = 1.0
+	env.glow_bloom = 0.0
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+	env.glow_hdr_threshold = 1.0  # only neon (>1.0) blooms
+	env.glow_hdr_scale = 2.0
+	for level in [1, 2, 3, 4]:
+		env.set_glow_level(level, true)
+	var world_env := WorldEnvironment.new()
+	world_env.environment = env
+	add_child(world_env)

@@ -53,6 +53,9 @@ var player_index := 0
 var input: PlayerInput
 ## Injected by Game; null disables the gun (headless logic tests don't need it).
 var bullet_manager: BulletManager
+## Injected by Game; muzzle FX read the bullet color from it (CP 1.6). Null in
+## logic tests, which skip the particle emitters entirely.
+var palette: PaletteResource
 var velocity := Vector2.ZERO
 
 var _alive := true
@@ -73,6 +76,11 @@ var skin: SkinResource:
 var move_bounds := Rect2()
 
 var _trail: Line2D
+## Persistent particle emitters (CP 1.6), built only when their color source is
+## injected (so headless logic tests stay node-light). World-space + top_level,
+## like the trail. Bullets draw above them (z 5), so neither can hide a bullet.
+var _muzzle: CPUParticles2D
+var _dash_trail: CPUParticles2D
 
 
 func _ready() -> void:
@@ -84,6 +92,14 @@ func _ready() -> void:
 	_trail.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	_trail.end_cap_mode = Line2D.LINE_CAP_ROUND
 	add_child(_trail)
+	if palette != null:
+		_muzzle = Fx.make_muzzle(palette.player_bullet_color)
+		_muzzle.top_level = true
+		add_child(_muzzle)
+	if skin != null:
+		_dash_trail = Fx.make_dash_trail(skin.trail_color)
+		_dash_trail.top_level = true
+		add_child(_dash_trail)
 	_apply_skin()
 
 
@@ -120,6 +136,10 @@ func try_kill() -> bool:
 	_alive = false
 	velocity = Vector2.ZERO
 	visible = false  # hides the trail too (visibility is tree-wide; top_level only exempts transform)
+	if _muzzle != null:
+		_muzzle.emitting = false
+	if _dash_trail != null:
+		_dash_trail.emitting = false
 	if is_inside_tree() and skin != null:
 		Burst.spawn(get_parent(), global_position, skin.body_color,
 				DEATH_PARTICLES, DEATH_BURST_SPEED)
@@ -191,16 +211,28 @@ func _update_fire(delta: float, aim: Vector2) -> void:
 	for _shot in _weapon.tick(delta, firing):
 		bullet_manager.spawn_player_bullet(
 			player_index, global_position + dir * Weapon.MUZZLE_OFFSET, dir)
+	if _muzzle != null:
+		# Muzzle spray rides the exact aim at the muzzle point, not the slewing nose.
+		_muzzle.emitting = firing
+		if firing:
+			_muzzle.global_position = global_position + dir * Weapon.MUZZLE_OFFSET
+			_muzzle.rotation = dir.angle()
 
 
 func _update_dash_visual() -> void:
-	if _dash.is_dashing():
+	var dashing := _dash.is_dashing()
+	if dashing:
 		# Ghost: the body fades while the trail keeps burning.
 		self_modulate = Color(1.0, 1.0, 1.0, DASH_GHOST_ALPHA)
 	else:
 		# Readiness without HUD: the body glow refills with the cooldown.
 		var brightness := lerpf(DASH_REFILL_DIM, 1.0, _dash.cooldown_fraction())
 		self_modulate = Color(brightness, brightness, brightness, 1.0)
+	if _dash_trail != null:
+		# Afterimage puffs left in world space as the ship rockets off.
+		_dash_trail.emitting = dashing
+		if dashing:
+			_dash_trail.global_position = global_position
 
 
 func _update_trail() -> void:

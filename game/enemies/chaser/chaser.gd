@@ -88,6 +88,7 @@ func die() -> void:
 	if is_inside_tree() and palette != null:
 		Burst.spawn(get_parent(), global_position, palette.enemy_color,
 				POP_PARTICLES, POP_SPEED)
+	EventBus.enemy_killed.emit(global_position)  # juice + (later) score/audio
 	deactivate()
 
 

@@ -11,8 +11,9 @@ extends Node
 
 signal changed(key: StringName, value: Variant)
 
-# Effect intensities (0..1 scalars; 1.0 = full as authored).
+# Effect intensities (0..1 scalars; 1.0 = full as authored, 0 = off).
 var screenshake_intensity: float = 1.0
+var hitstop_intensity: float = 1.0   ## scales the kill/death time-freeze (CP 1.6)
 var flash_intensity: float = 1.0
 var crt_enabled: bool = true
 var crt_intensity: float = 0.5
